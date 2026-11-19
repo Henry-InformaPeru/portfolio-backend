@@ -1,0 +1,43 @@
+services:
+  portfolio-postgres:
+    image: postgres:16-alpine
+    container_name: portfolio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-portfolio}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-informaperu}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - portfolio_pg_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-portfolio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  portfolio-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: portfolio-api
+    restart: unless-stopped
+    depends_on:
+      portfolio-postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PORT: ${PORT:-3200}
+      DB_HOST: portfolio-postgres
+      DB_PORT: 5432
+      DB_SSL: "false"
+    ports:
+      - "${PORT:-3200}:${PORT:-3200}"
+    volumes:
+      - ./storage:/app/storage
+
+volumes:
+  portfolio_pg_data:
